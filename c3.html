@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Live Chat App</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      background-color: #f4f4f9;
+    }
+
+    .chat-container {
+      width: 80%;
+      max-width: 600px;
+      background-color: white;
+      padding: 20px;
+      border-radius: 10px;
+      box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    #messageBox {
+      height: 300px;
+      overflow-y: scroll;
+      margin-bottom: 20px;
+    }
+
+    #messageInput {
+      width: 70%;
+      padding: 10px;
+      border: 1px solid #ccc;
+      border-radius: 5px;
+    }
+
+    button {
+      padding: 10px;
+      border: none;
+      background-color: #5c6bc0;
+      color: white;
+      border-radius: 5px;
+      cursor: pointer;
+      margin-top: 10px;
+    }
+
+    button:hover {
+      background-color: #3f51b5;
+    }
+
+    input[type="file"] {
+      display: none;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="chat-container">
+    <div class="header">
+      <h1>Live Chat</h1>
+      <input type="password" id="adminPassword" placeholder="Admin Password" hidden>
+      <button id="banButton" hidden>Ban User</button>
+    </div>
+    <div class="message-box" id="messageBox"></div>
+    <input type="text" id="messageInput" placeholder="Type a message">
+    <button id="sendMessage">Send</button>
+
+    <!-- Change Username -->
+    <div>
+      <input type="text" id="usernameInput" placeholder="Set Username">
+    </div>
+
+    <!-- Upload File -->
+    <input type="file" id="fileInput" hidden>
+    <button id="uploadFileButton">Upload File</button>
+
+    <!-- Profile Picture -->
+    <input type="file" id="profilePicInput" hidden>
+    <button id="setProfilePicButton">Set Profile Picture</button>
+  </div>
+
+  <!-- Firebase Scripts -->
+  <script src="https://www.gstatic.com/firebasejs/9.0.2/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.0.2/firebase-firestore.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.0.2/firebase-storage.js"></script>
+  <script>
+    // Firebase configuration
+ const firebaseConfig = {
+    apiKey: "AIzaSyD4ci18awty1a49hrw5hF36_LfcysL8kZg",
+    authDomain: "t-d-network.firebaseapp.com",
+    projectId: "t-d-network",
+    storageBucket: "t-d-network.firebasestorage.app",
+    messagingSenderId: "1003422644044",
+    appId: "1:1003422644044:web:5092d63d1d12d0e1d481e9",
+    measurementId: "G-BR34R82646"
+  };
+
+    // Initialize Firebase
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+    const storage = firebase.storage();
+    const messagesRef = db.collection('messages');
+
+    // Admin password
+    const adminPassword = "yourSecretPassword";  // Set a secret password for admin actions
+
+    // UI elements
+    const messageBox = document.getElementById('messageBox');
+    const messageInput = document.getElementById('messageInput');
+    const sendMessageButton = document.getElementById('sendMessage');
+    const usernameInput = document.getElementById('usernameInput');
+    const uploadFileButton = document.getElementById('uploadFileButton');
+    const profilePicInput = document.getElementById('profilePicInput');
+    const setProfilePicButton = document.getElementById('setProfilePicButton');
+    const banButton = document.getElementById('banButton');
+    const adminPasswordInput = document.getElementById('adminPassword');
+
+    // Listen for new messages
+    messagesRef.orderBy("timestamp").onSnapshot(snapshot => {
+      messageBox.innerHTML = ''; // Clear previous messages
+      snapshot.forEach(doc => {
+        const message = doc.data();
+        const messageDiv = document.createElement('div');
+        messageDiv.innerHTML = `${message.username}: ${message.text} <span class="emoji-react">❤️</span>`;
+        messageBox.appendChild(messageDiv);
+      });
+    });
+
+    // Send Message
+    sendMessageButton.addEventListener('click', () => {
+      const text = messageInput.value;
+      const username = usernameInput.value || 'Anonymous';
+      if (text) {
+        messagesRef.add({
+          username: username,
+          text: text,
+          timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+        });
+        messageInput.value = ''; // Clear input field
+      }
+    });
+
+    // Set Profile Picture
+    setProfilePicButton.addEventListener('click', () => {
+      const file = profilePicInput.files[0];
+      if (file) {
+        const storageRef = storage.ref().child('profile_pictures/' + file.name);
+        storageRef.put(file).then(() => {
+          storageRef.getDownloadURL().then(url => {
+            alert('Profile picture uploaded! URL: ' + url);
+          });
+        });
+      }
+    });
+
+    // Upload File
+    uploadFileButton.addEventListener('click', () => {
+      const file = document.getElementById('fileInput').files[0];
+      if (file) {
+        const fileRef = storage.ref().child('chat_files/' + file.name);
+        fileRef.put(file).then(() => {
+          fileRef.getDownloadURL().then(url => {
+            messagesRef.add({
+              username: 'Admin',
+              text: `File uploaded: <a href="${url}" target="_blank">${file.name}</a>`,
+              timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+            });
+          });
+        });
+      }
+    });
+
+    // Ban User (Admin Only)
+    banButton.addEventListener('click', () => {
+      const password = adminPasswordInput.value;
+      if (password === adminPassword) {
+        // Logic to ban user (e.g., remove their messages or block them from sending)
+        alert('User banned!');
+      } else {
+        alert('Incorrect admin password.');
+      }
+    });
+  </script>
+</body>
+</html>
