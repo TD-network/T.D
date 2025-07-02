@@ -15,7 +15,6 @@
       height: 100vh;
       background-color: #f4f4f9;
     }
-
     .chat-container {
       width: 80%;
       max-width: 600px;
@@ -24,26 +23,22 @@
       border-radius: 10px;
       box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
     }
-
     .header {
       display: flex;
       justify-content: space-between;
       align-items: center;
     }
-
     #messageBox {
       height: 300px;
       overflow-y: scroll;
       margin-bottom: 20px;
     }
-
     #messageInput {
       width: 70%;
       padding: 10px;
       border: 1px solid #ccc;
       border-radius: 5px;
     }
-
     button {
       padding: 10px;
       border: none;
@@ -53,18 +48,11 @@
       cursor: pointer;
       margin-top: 10px;
     }
-
     button:hover {
       background-color: #3f51b5;
     }
-
     input[type="file"] {
       display: none;
-    }
-
-    .emoji-react {
-      cursor: pointer;
-      margin-left: 10px;
     }
   </style>
 </head>
@@ -73,30 +61,23 @@
   <div class="chat-container">
     <div class="header">
       <h1>Live Chat</h1>
-      <input type="password" id="adminPassword" placeholder="Admin Password" hidden>
-      <button id="banButton" hidden>Ban User</button>
+      <!-- Optionally, you can have buttons like Admin Password -->
     </div>
     <div class="message-box" id="messageBox"></div>
     <input type="text" id="messageInput" placeholder="Type a message">
-    <button id="sendMessage" disabled>Send</button>
-
-    <!-- Change Username -->
-    <div>
-      <input type="text" id="usernameInput" placeholder="Set Username">
-    </div>
+    <button id="sendMessage">Send</button>
 
     <!-- Upload File -->
     <input type="file" id="fileInput" hidden>
     <button id="uploadFileButton">Upload File</button>
 
-    <!-- Profile Picture -->
+    <!-- Set Profile Picture -->
     <input type="file" id="profilePicInput" hidden>
     <button id="setProfilePicButton">Set Profile Picture</button>
   </div>
 
   <!-- Firebase Scripts -->
   <script src="https://www.gstatic.com/firebasejs/9.0.2/firebase-app.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.0.2/firebase-auth.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.0.2/firebase-database.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.0.2/firebase-storage.js"></script>
   <script>
@@ -122,21 +103,15 @@
     const messageBox = document.getElementById('messageBox');
     const messageInput = document.getElementById('messageInput');
     const sendMessageButton = document.getElementById('sendMessage');
-    const usernameInput = document.getElementById('usernameInput');
     const uploadFileButton = document.getElementById('uploadFileButton');
     const profilePicInput = document.getElementById('profilePicInput');
     const setProfilePicButton = document.getElementById('setProfilePicButton');
-    const banButton = document.getElementById('banButton');
-    const adminPasswordInput = document.getElementById('adminPassword');
 
     // Listen for new messages in Realtime Database
     messagesRef.on('child_added', (snapshot) => {
       const message = snapshot.val();
       const messageDiv = document.createElement('div');
-      messageDiv.innerHTML = `${message.username}: ${message.text} 
-        <span class="emoji-react" onclick="addReaction('${snapshot.key}', '❤️')">❤️</span>
-        <span class="emoji-react" onclick="addReaction('${snapshot.key}', '👍')">👍</span>
-        <span class="emoji-react" onclick="addReaction('${snapshot.key}', '😂')">😂</span>`;
+      messageDiv.textContent = message.text;
       messageBox.appendChild(messageDiv);
       messageBox.scrollTop = messageBox.scrollHeight; // Auto-scroll
     });
@@ -144,10 +119,8 @@
     // Send message
     sendMessageButton.addEventListener('click', () => {
       const text = messageInput.value;
-      const username = usernameInput.value || 'Anonymous';
       if (text) {
         messagesRef.push({
-          username: username,
           text: text,
           timestamp: firebase.database.ServerValue.TIMESTAMP,
         });
@@ -155,12 +128,23 @@
       }
     });
 
-    // Enable send button when message input is not empty
-    messageInput.addEventListener('input', () => {
-      sendMessageButton.disabled = !messageInput.value.trim();
+    // Upload file
+    uploadFileButton.addEventListener('click', () => {
+      const file = document.getElementById('fileInput').files[0];
+      if (file) {
+        const fileRef = storage.ref().child('chat_files/' + file.name);
+        fileRef.put(file).then(() => {
+          fileRef.getDownloadURL().then(url => {
+            messagesRef.push({
+              text: `File uploaded: <a href="${url}" target="_blank">${file.name}</a>`,
+              timestamp: firebase.database.ServerValue.TIMESTAMP,
+            });
+          });
+        });
+      }
     });
 
-    // Set profile picture
+    // Set Profile Picture
     setProfilePicButton.addEventListener('click', () => {
       const file = profilePicInput.files[0];
       if (file) {
@@ -172,55 +156,6 @@
         });
       }
     });
-
-    // Upload file
-    uploadFileButton.addEventListener('click', () => {
-      document.getElementById('fileInput').click();
-    });
-
-    document.getElementById('fileInput').addEventListener('change', (e) => {
-      const file = e.target.files[0];
-      if (file) {
-        // Validate file type and size
-        if (file.size > 5 * 1024 * 1024) { // Check for file size greater than 5MB
-          alert('File size exceeds the 5MB limit.');
-          return;
-        }
-        if (!['image/jpeg', 'image/png', 'application/pdf'].includes(file.type)) {
-          alert('Invalid file type. Please upload a valid image or PDF.');
-          return;
-        }
-
-        const fileRef = storage.ref().child('chat_files/' + file.name);
-        fileRef.put(file).then(() => {
-          fileRef.getDownloadURL().then(url => {
-            messagesRef.push({
-              username: 'Admin',
-              text: `File uploaded: <a href="${url}" target="_blank">${file.name}</a>`,
-              timestamp: firebase.database.ServerValue.TIMESTAMP,
-            });
-          });
-        });
-      }
-    });
-
-    // Ban User (Admin Only)
-    banButton.addEventListener('click', () => {
-      const password = adminPasswordInput.value;
-      if (password === 'yourSecretPassword') {
-        alert('User banned!');
-        // You can implement logic to block users or remove messages
-      } else {
-        alert('Incorrect admin password.');
-      }
-    });
-
-    // Emoji Reaction
-    function addReaction(messageId, emoji) {
-      const reactionRef = db.ref('reactions/' + messageId);
-      reactionRef.child(emoji).transaction(current => (current || 0) + 1);
-    }
-
   </script>
 </body>
 </html>
