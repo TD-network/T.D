@@ -61,6 +61,11 @@
     input[type="file"] {
       display: none;
     }
+
+    .emoji-react {
+      cursor: pointer;
+      margin-left: 10px;
+    }
   </style>
 </head>
 <body>
@@ -73,7 +78,7 @@
     </div>
     <div class="message-box" id="messageBox"></div>
     <input type="text" id="messageInput" placeholder="Type a message">
-    <button id="sendMessage">Send</button>
+    <button id="sendMessage" disabled>Send</button>
 
     <!-- Change Username -->
     <div>
@@ -91,28 +96,27 @@
 
   <!-- Firebase Scripts -->
   <script src="https://www.gstatic.com/firebasejs/9.0.2/firebase-app.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.0.2/firebase-firestore.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.0.2/firebase-auth.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.0.2/firebase-database.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.0.2/firebase-storage.js"></script>
   <script>
     // Firebase configuration
- const firebaseConfig = {
-    apiKey: "AIzaSyD4ci18awty1a49hrw5hF36_LfcysL8kZg",
-    authDomain: "t-d-network.firebaseapp.com",
-    projectId: "t-d-network",
-    storageBucket: "t-d-network.firebasestorage.app",
-    messagingSenderId: "1003422644044",
-    appId: "1:1003422644044:web:5092d63d1d12d0e1d481e9",
-    measurementId: "G-BR34R82646"
-  };
+    const firebaseConfig = {
+      apiKey: "AIzaSyD4ci18awty1a49hrw5hF36_LfcysL8kZg",
+      authDomain: "t-d-network.firebaseapp.com",
+      databaseURL: "https://t-d-network-default-rtdb.firebaseio.com",
+      projectId: "t-d-network",
+      storageBucket: "t-d-network.appspot.com",
+      messagingSenderId: "1003422644044",
+      appId: "1:1003422644044:web:5092d63d1d12d0e1d481e9",
+      measurementId: "G-BR34R82646"
+    };
 
     // Initialize Firebase
     firebase.initializeApp(firebaseConfig);
-    const db = firebase.firestore();
+    const db = firebase.database();
     const storage = firebase.storage();
-    const messagesRef = db.collection('messages');
-
-    // Admin password
-    const adminPassword = "yourSecretPassword";  // Set a secret password for admin actions
+    const messagesRef = db.ref('messages');
 
     // UI elements
     const messageBox = document.getElementById('messageBox');
@@ -125,32 +129,38 @@
     const banButton = document.getElementById('banButton');
     const adminPasswordInput = document.getElementById('adminPassword');
 
-    // Listen for new messages
-    messagesRef.orderBy("timestamp").onSnapshot(snapshot => {
-      messageBox.innerHTML = ''; // Clear previous messages
-      snapshot.forEach(doc => {
-        const message = doc.data();
-        const messageDiv = document.createElement('div');
-        messageDiv.innerHTML = `${message.username}: ${message.text} <span class="emoji-react">❤️</span>`;
-        messageBox.appendChild(messageDiv);
-      });
+    // Listen for new messages in Realtime Database
+    messagesRef.on('child_added', (snapshot) => {
+      const message = snapshot.val();
+      const messageDiv = document.createElement('div');
+      messageDiv.innerHTML = `${message.username}: ${message.text} 
+        <span class="emoji-react" onclick="addReaction('${snapshot.key}', '❤️')">❤️</span>
+        <span class="emoji-react" onclick="addReaction('${snapshot.key}', '👍')">👍</span>
+        <span class="emoji-react" onclick="addReaction('${snapshot.key}', '😂')">😂</span>`;
+      messageBox.appendChild(messageDiv);
+      messageBox.scrollTop = messageBox.scrollHeight; // Auto-scroll
     });
 
-    // Send Message
+    // Send message
     sendMessageButton.addEventListener('click', () => {
       const text = messageInput.value;
       const username = usernameInput.value || 'Anonymous';
       if (text) {
-        messagesRef.add({
+        messagesRef.push({
           username: username,
           text: text,
-          timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+          timestamp: firebase.database.ServerValue.TIMESTAMP,
         });
         messageInput.value = ''; // Clear input field
       }
     });
 
-    // Set Profile Picture
+    // Enable send button when message input is not empty
+    messageInput.addEventListener('input', () => {
+      sendMessageButton.disabled = !messageInput.value.trim();
+    });
+
+    // Set profile picture
     setProfilePicButton.addEventListener('click', () => {
       const file = profilePicInput.files[0];
       if (file) {
@@ -163,17 +173,31 @@
       }
     });
 
-    // Upload File
+    // Upload file
     uploadFileButton.addEventListener('click', () => {
-      const file = document.getElementById('fileInput').files[0];
+      document.getElementById('fileInput').click();
+    });
+
+    document.getElementById('fileInput').addEventListener('change', (e) => {
+      const file = e.target.files[0];
       if (file) {
+        // Validate file type and size
+        if (file.size > 5 * 1024 * 1024) { // Check for file size greater than 5MB
+          alert('File size exceeds the 5MB limit.');
+          return;
+        }
+        if (!['image/jpeg', 'image/png', 'application/pdf'].includes(file.type)) {
+          alert('Invalid file type. Please upload a valid image or PDF.');
+          return;
+        }
+
         const fileRef = storage.ref().child('chat_files/' + file.name);
         fileRef.put(file).then(() => {
           fileRef.getDownloadURL().then(url => {
-            messagesRef.add({
+            messagesRef.push({
               username: 'Admin',
               text: `File uploaded: <a href="${url}" target="_blank">${file.name}</a>`,
-              timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+              timestamp: firebase.database.ServerValue.TIMESTAMP,
             });
           });
         });
@@ -183,13 +207,20 @@
     // Ban User (Admin Only)
     banButton.addEventListener('click', () => {
       const password = adminPasswordInput.value;
-      if (password === adminPassword) {
-        // Logic to ban user (e.g., remove their messages or block them from sending)
+      if (password === 'yourSecretPassword') {
         alert('User banned!');
+        // You can implement logic to block users or remove messages
       } else {
         alert('Incorrect admin password.');
       }
     });
+
+    // Emoji Reaction
+    function addReaction(messageId, emoji) {
+      const reactionRef = db.ref('reactions/' + messageId);
+      reactionRef.child(emoji).transaction(current => (current || 0) + 1);
+    }
+
   </script>
 </body>
 </html>
