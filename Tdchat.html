@@ -163,9 +163,7 @@ service cloud.firestore {
     import { getDatabase, ref, push, set, onChildAdded, serverTimestamp } 
   from "https://www.gstatic.com/firebasejs/10.12.5/firebase-database.js";
 
-const rtdb = getDatabase(app);
-import { getDatabase, ref, push, set, onChildAdded, serverTimestamp } 
-  from "https://www.gstatic.com/firebasejs/10.12.5/firebase-database.js";
+
 
 
 
@@ -179,6 +177,9 @@ import { getDatabase, ref, push, set, onChildAdded, serverTimestamp }
     appId: "1:625716489108:web:f877fbf6eef5bd0972bd81",
     measurementId: "G-LT61G7TTHX"
   };
+    const rtdb = getDatabase(app);
+import { getDatabase, ref, push, set, onChildAdded, serverTimestamp } 
+  from "https://www.gstatic.com/firebasejs/10.12.5/firebase-database.js";
 
 
     // Firebase v9+ modular CDN
