@@ -167,24 +167,7 @@ const rtdb = getDatabase(app);
 import { getDatabase, ref, push, set, onChildAdded, serverTimestamp } 
   from "https://www.gstatic.com/firebasejs/10.12.5/firebase-database.js";
 
-const rtdb = getDatabase(app);
-async function sendMessage(groupId, text) {
-  const msgRef = ref(rtdb, `groups/${groupId}/messages`);
-  await push(msgRef, {
-    text,
-    uid: currentUser.uid,
-    displayName: currentUser.displayName || currentUser.email,
-    createdAt: Date.now() // or serverTimestamp()
-  });
-}
-function listenMessages(groupId) {
-  const msgRef = ref(rtdb, `groups/${groupId}/messages`);
-  onChildAdded(msgRef, (snapshot) => {
-    const msg = snapshot.val();
-    scroller.appendChild(renderMessage(snapshot.key, msg));
-    scroller.scrollTop = scroller.scrollHeight;
-  });
-}
+
 
     // Why: keep single-file deployable; replace with your project's config.
   const firebaseConfig = {
