@@ -1,0 +1,414 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>WhatsApp‑Lite (Firebase)</title>
+  <meta name="description" content="A minimal WhatsApp‑like private group chat built on Firebase (Auth + Firestore). Single-file HTML for GitHub Pages." />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root{--bg:#0b141a;--bg2:#111b21;--panel:#202c33;--panel2:#0e171c;--text:#e9edef;--muted:#8696a0;--accent:#25d366;--danger:#ef4444;--border:#2a3942}
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{margin:0;background:var(--bg);color:var(--text);font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif}
+    .app{display:grid;grid-template-columns:320px 1fr;height:100vh}
+    .sidebar{background:var(--bg2);border-right:1px solid var(--border);display:flex;flex-direction:column}
+    .topbar{height:56px;display:flex;align-items:center;justify-content:space-between;padding:0 12px;border-bottom:1px solid var(--border);background:var(--panel2)}
+    .brand{display:flex;gap:10px;align-items:center;font-weight:700}
+    .brand .dot{width:10px;height:10px;border-radius:50%;background:var(--accent)}
+    .auth{display:flex;gap:8px;align-items:center}
+    button{appearance:none;border:0;border-radius:10px;background:var(--panel);color:var(--text);padding:8px 12px;font-weight:600;cursor:pointer}
+    button.ghost{background:transparent;border:1px solid var(--border)}
+    button.primary{background:var(--accent);color:#062d17}
+    button.danger{background:var(--danger)}
+    .search{padding:8px;border-bottom:1px solid var(--border)}
+    .search input{width:100%;padding:10px;border-radius:8px;border:1px solid var(--border);background:var(--panel2);color:var(--text)}
+    .list{overflow:auto}
+    .item{display:flex;gap:10px;align-items:center;padding:12px 14px;border-bottom:1px solid var(--border);cursor:pointer}
+    .item:hover{background:#152027}
+    .item.active{background:#152d2a}
+    .avatar{width:36px;height:36px;border-radius:50%;background:#32434c;display:grid;place-items:center;font-weight:700}
+    .grow{flex:1}
+
+    .chat{display:grid;grid-template-rows:56px 1fr auto;height:100vh}
+    .chat .header{display:flex;align-items:center;gap:12px;padding:0 14px;border-bottom:1px solid var(--border);background:var(--panel2)}
+    .chat .header .title{font-weight:700}
+    .messages{background:url('https://images.unsplash.com/photo-1470317596697-cbdeda56f999?q=80&w=1200&auto=format&fit=crop') center/cover fixed;}
+    .messages .scroller{height:100%;overflow:auto;padding:16px}
+    .bubble{max-width:72ch;margin:6px 0;padding:10px 12px;border-radius:14px;background:var(--panel);display:inline-block}
+    .me{background:#115e59}
+    .meta{display:flex;gap:8px;color:var(--muted);font-size:12px;margin-top:4px}
+
+    .composer{display:flex;gap:8px;align-items:center;padding:10px;border-top:1px solid var(--border);background:var(--panel2)}
+    .composer input[type="text"]{flex:1;padding:12px 14px;border-radius:999px;border:1px solid var(--border);background:var(--panel);color:var(--text)}
+    .composer .split{display:flex;gap:8px}
+
+    .empty{height:100%;display:grid;place-items:center;color:var(--muted)}
+
+    .toolbar{display:flex;gap:8px;padding:8px;border-top:1px solid var(--border);background:var(--panel2)}
+    .toolbar input{width:180px;padding:8px;border-radius:8px;border:1px solid var(--border);background:var(--panel);color:var(--text)}
+
+    @media (max-width: 900px){.app{grid-template-columns:1fr}.sidebar{display:none}.sidebar.show{display:flex}.chat.hide{display:none}}
+    .pill{font-size:12px;padding:2px 8px;border-radius:999px;border:1px solid var(--border);color:var(--muted)}
+    .note{background:#0f1a20;border-left:4px solid var(--accent);padding:10px 12px;border-radius:8px;margin:8px 0;color:#b7c4cc}
+    code.inline{background:#0a0f13;border:1px solid #182029;padding:2px 6px;border-radius:6px}
+  </style>
+</head>
+<body>
+  <div class="topbar">
+    <div class="brand"><span class="dot"></span> WhatsApp‑Lite</div>
+    <div class="auth">
+      <span id="userInfo" class="pill">Signed out</span>
+      <button id="btnSignIn" class="primary">Sign in with Google</button>
+      <button id="btnSignOut" class="ghost" style="display:none">Sign out</button>
+      <button id="btnToggleSidebar" class="ghost">☰</button>
+    </div>
+  </div>
+
+  <div class="app">
+    <aside id="sidebar" class="sidebar">
+      <div class="search">
+        <input id="searchInput" placeholder="Search groups" />
+      </div>
+
+      <div class="toolbar">
+        <button id="btnNewGroup" title="Create private group">+ New</button>
+        <input id="joinCode" placeholder="Invite code" />
+        <button id="btnJoinCode" class="primary">Join</button>
+      </div>
+
+      <div id="groupsList" class="list" aria-live="polite"></div>
+    </aside>
+
+    <main id="chat" class="chat">
+      <div class="header">
+        <div class="avatar" id="roomAvatar">💬</div>
+        <div class="grow">
+          <div id="roomTitle" class="title">No room selected</div>
+          <div id="roomMeta" class="meta"></div>
+        </div>
+        <span class="pill" id="memberCount">0 members</span>
+      </div>
+
+      <section class="messages">
+        <div id="scroller" class="scroller"></div>
+      </section>
+
+      <form id="composer" class="composer">
+        <input id="messageInput" type="text" placeholder="Type a message" autocomplete="off" />
+        <div class="split">
+          <button id="btnEmoji" type="button">😊</button>
+          <button id="btnSend" class="primary" type="submit">Send</button>
+        </div>
+      </form>
+    </main>
+  </div>
+
+  <!-- Quick Start / TODOs (keep for GitHub readers) -->
+  <section class="note" style="max-width:1100px;margin:16px auto">
+    <strong>Setup</strong>
+    <ol>
+      <li>Create a Firebase project → Web App → copy config into <code class="inline">firebaseConfig</code>.</li>
+      <li>Enable <em>Authentication → Google</em>. Enable <em>Firestore</em> (production rules below).</li>
+      <li>Host on any static hosting (GitHub Pages works). No build step needed.</li>
+    </ol>
+    <details>
+      <summary><strong>Firestore Rules (paste in Firebase Console)</strong></summary>
+      <pre style="white-space:pre-wrap">rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isSignedIn() { return request.auth != null; }
+    function isMember(groupId) {
+      return exists(/databases/$(database)/documents/groupMembers/$(groupId + '_' + request.auth.uid));
+    }
+    function isOwner(groupId) {
+      return get(/databases/$(database)/documents/groups/$(groupId)).data.ownerId == request.auth.uid;
+    }
+
+    match /users/{uid} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn() && request.auth.uid == uid;
+    }
+
+    match /groups/{groupId} {
+      allow read: if isSignedIn() && isMember(groupId);
+      allow create: if isSignedIn();
+      allow update, delete: if isSignedIn() && isOwner(groupId);
+
+      match /messages/{msgId} {
+        allow read, list: if isSignedIn() && isMember(groupId);
+        allow create: if isSignedIn() && isMember(groupId) &&
+          request.resource.data.text is string &&
+          request.resource.data.text.size() > 0 &&
+          request.resource.data.text.size() <= 2000;
+        allow delete: if isSignedIn() && (isOwner(groupId) || resource.data.uid == request.auth.uid);
+      }
+    }
+
+    match /groupMembers/{id} {
+      allow read: if isSignedIn() && isMember(resource.data.groupId);
+      allow create: if isSignedIn() && request.resource.data.uid == request.auth.uid;
+      allow delete: if isSignedIn() && (request.auth.uid == resource.data.uid || isOwner(resource.data.groupId));
+      allow update: if false; // immutable role in this simple app
+    }
+  }
+}
+</pre>
+    </details>
+  </section>
+
+  <script type="module">
+    // Why: keep single-file deployable; replace with your project's config.
+ const firebaseConfig = {
+  apiKey: "AIzaSyBJX7U2MwYBo7W5c2gLeHgM5Iv7kD6nXlk",
+  authDomain: "t-dchat.firebaseapp.com",
+  projectId: "t-dchat",
+  storageBucket: "t-dchat.firebasestorage.app",
+  messagingSenderId: "625716489108",
+  appId: "1:625716489108:web:f877fbf6eef5bd0972bd81",
+  measurementId: "G-LT61G7TTHX"
+};
+
+
+    // Firebase v9+ modular CDN
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js";
+    import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut as fbSignOut } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js";
+    import { getFirestore, collection, doc, getDoc, setDoc, addDoc, onSnapshot, query, where, orderBy, serverTimestamp, deleteDoc } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js";
+
+    // App state (minimal)
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+
+    let currentUser = null;
+    let currentGroup = null;
+    let unsubMessages = null;
+    let unsubGroups = null;
+
+    // Elements
+    const el = (id) => document.getElementById(id);
+    const groupsList = el('groupsList');
+    const scroller = el('scroller');
+    const composer = el('composer');
+    const messageInput = el('messageInput');
+    const roomTitle = el('roomTitle');
+    const roomMeta = el('roomMeta');
+    const memberCount = el('memberCount');
+
+    // Auth UI
+    el('btnSignIn').onclick = async () => {
+      try{
+        await signInWithPopup(auth, new GoogleAuthProvider());
+      }catch(err){ alert('Sign-in failed: ' + err.message); }
+    };
+    el('btnSignOut').onclick = async () => { await fbSignOut(auth); };
+
+    el('btnToggleSidebar').onclick = () => {
+      const s = document.getElementById('sidebar');
+      s.classList.toggle('show');
+      const c = document.getElementById('chat');
+      c.classList.toggle('hide');
+    };
+
+    onAuthStateChanged(auth, async (user) => {
+      currentUser = user;
+      el('userInfo').textContent = user ? (user.displayName || user.email) : 'Signed out';
+      el('btnSignIn').style.display = user ? 'none' : '';
+      el('btnSignOut').style.display = user ? '' : 'none';
+      if (user) {
+        await ensureUserDoc(user);
+        watchUserGroups(user.uid);
+      } else {
+        detachListeners();
+        groupsList.innerHTML = '';
+        selectGroup(null);
+      }
+    });
+
+    async function ensureUserDoc(user){
+      const ref = doc(db, 'users', user.uid);
+      const snap = await getDoc(ref);
+      if(!snap.exists()){
+        await setDoc(ref, {
+          uid: user.uid,
+          displayName: user.displayName || '',
+          photoURL: user.photoURL || '',
+          createdAt: serverTimestamp(),
+        });
+      }
+    }
+
+    function detachListeners(){
+      if (unsubMessages) unsubMessages();
+      if (unsubGroups) unsubGroups();
+      unsubMessages = unsubGroups = null;
+    }
+
+    // Group creation and joining
+    el('btnNewGroup').onclick = async () => {
+      if(!currentUser) return alert('Sign in first.');
+      const name = prompt('Group name?');
+      if(!name) return;
+      const inviteCode = genCode();
+      const groupRef = await addDoc(collection(db, 'groups'), {
+        name, isPrivate: true, ownerId: currentUser.uid, inviteCode,
+        createdAt: serverTimestamp()
+      });
+      await setDoc(doc(db, 'groupMembers', `${groupRef.id}_${currentUser.uid}`), {
+        groupId: groupRef.id, uid: currentUser.uid, role: 'owner', joinedAt: serverTimestamp()
+      });
+      alert(`Group created. Invite code: ${inviteCode}`);
+    };
+
+    el('btnJoinCode').onclick = async () => {
+      if(!currentUser) return alert('Sign in first.');
+      const code = (el('joinCode').value || '').trim();
+      if(!code) return alert('Enter invite code.');
+      const q = query(collection(db, 'groups'), where('inviteCode','==',code));
+      const stop = onSnapshot(q, async (snap) => {
+        stop();
+        if (snap.empty) { alert('Invalid code.'); return; }
+        const g = snap.docs[0];
+        await setDoc(doc(db, 'groupMembers', `${g.id}_${currentUser.uid}`), {
+          groupId: g.id, uid: currentUser.uid, role: 'member', joinedAt: serverTimestamp()
+        });
+        el('joinCode').value = '';
+      });
+    };
+
+    function genCode(){ return Math.random().toString(36).slice(2,8).toUpperCase(); }
+
+    // Watch membership → list groups
+    function watchUserGroups(uid){
+      if (unsubGroups) unsubGroups();
+      const qMembers = query(collection(db, 'groupMembers'), where('uid','==',uid));
+      unsubGroups = onSnapshot(qMembers, (snap) => {
+        const groupIds = snap.docs.map(d => d.data().groupId);
+        if(groupIds.length === 0){ groupsList.innerHTML = `<div class="empty">No groups yet. Create or join with a code.</div>`; return; }
+        // For each groupId, fetch doc once and render (kept simple)
+        groupsList.innerHTML = '';
+        groupIds.forEach(async (gid) => {
+          const gref = doc(db, 'groups', gid);
+          const gsnap = await getDoc(gref);
+          if(!gsnap.exists()) return;
+          const g = { id: gid, ...gsnap.data() };
+          const node = renderGroupItem(g);
+          groupsList.appendChild(node);
+        });
+      });
+    }
+
+    function renderGroupItem(g){
+      const div = document.createElement('div');
+      div.className = 'item';
+      div.innerHTML = `<div class="avatar">#</div><div class="grow"><div>${escapeHTML(g.name)}</div><div class="meta">private • code ${g.inviteCode}</div></div>`;
+      div.onclick = () => selectGroup(g);
+      if(currentGroup && currentGroup.id === g.id) div.classList.add('active');
+      return div;
+    }
+
+    function selectGroup(g){
+      currentGroup = g;
+      roomTitle.textContent = g ? g.name : 'No room selected';
+      roomMeta.textContent = g ? `Invite code: ${g.inviteCode}` : '';
+      memberCount.textContent = '…';
+      // Update active highlight
+      [...groupsList.children].forEach(c => c.classList.remove('active'));
+      if(g){
+        [...groupsList.children].forEach(c => { if(c.textContent.includes(g.inviteCode)) c.classList.add('active'); });
+        watchMessages(g.id);
+        countMembers(g.id);
+      } else {
+        scroller.innerHTML = '';
+        if(unsubMessages) { unsubMessages(); unsubMessages=null; }
+      }
+    }
+
+    function countMembers(groupId){
+      const qM = query(collection(db, 'groupMembers'), where('groupId','==',groupId));
+      onSnapshot(qM, (snap)=>{ memberCount.textContent = `${snap.size} member${snap.size===1?'':'s'}`; });
+    }
+
+    function watchMessages(groupId){
+      if(unsubMessages) unsubMessages();
+      const qMsg = query(collection(db, 'groups', groupId, 'messages'), orderBy('createdAt','asc'));
+      unsubMessages = onSnapshot(qMsg, (snap) => {
+        scroller.innerHTML = '';
+        snap.forEach(doc => scroller.appendChild(renderMessage(doc.id, doc.data())));
+        scroller.scrollTop = scroller.scrollHeight;
+      });
+    }
+
+    function renderMessage(id, m){
+      const wrap = document.createElement('div');
+      const isMe = currentUser && m.uid === currentUser.uid;
+      wrap.innerHTML = `
+        <div class="bubble ${isMe?'me':''}">
+          ${linkify(escapeHTML(m.text))}
+          <div class="meta">${escapeHTML(m.displayName || 'Unknown')} · ${fmtTime(m.createdAt)}</div>
+        </div>`;
+      return wrap;
+    }
+
+    composer.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      if(!currentUser) return alert('Sign in first.');
+      if(!currentGroup) return alert('Select a group.');
+      const text = (messageInput.value || '').trim();
+      if(!text) return;
+      messageInput.value = '';
+      try {
+        await addDoc(collection(db, 'groups', currentGroup.id, 'messages'), {
+          text,
+          uid: currentUser.uid,
+          displayName: currentUser.displayName || currentUser.email || 'User',
+          createdAt: serverTimestamp(),
+        });
+      } catch (e) {
+        alert('Send failed: ' + e.message);
+      }
+    });
+
+    // Basic helpers
+    function fmtTime(ts){
+      try{
+        if(!ts) return '…';
+        const d = ts.toDate();
+        return new Intl.DateTimeFormat(undefined,{hour:'2-digit',minute:'2-digit'}).format(d);
+      }catch{ return '…'; }
+    }
+    function escapeHTML(s){ return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;'}[c])); }
+    function linkify(s){
+      return s.replace(/(https?:\/\/[^\s]+)/g, '<a href="$1" target="_blank" rel="noopener">$1<\/a>');
+    }
+
+    // Search filter (client-side)
+    el('searchInput').addEventListener('input', (e) => {
+      const q = e.target.value.toLowerCase();
+      [...groupsList.children].forEach(li => {
+        li.style.display = li.textContent.toLowerCase().includes(q) ? '' : 'none';
+      });
+    });
+
+    // Emoji (minimal quick insert)
+    el('btnEmoji').addEventListener('click', () => {
+      messageInput.value += ' 😊';
+      messageInput.focus();
+    });
+
+    // Danger: delete current group (owner only) – exposed via console for brevity
+    // Why: avoid accidental UI delete; use intentionally via DevTools
+    window.__deleteCurrentGroup = async function(){
+      if(!currentGroup) return alert('No group selected');
+      if(!confirm('Delete group and all messages?')) return;
+      // NOTE: Firestore has no server-side cascade; this sample deletes only the group doc, leaving orphans.
+      // In production, use a Cloud Function to clean subcollections.
+      await deleteDoc(doc(db,'groups',currentGroup.id));
+      currentGroup = null;
+      selectGroup(null);
+    }
+  </script>
+</body>
+</html>
